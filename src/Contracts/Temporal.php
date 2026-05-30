@@ -7,6 +7,7 @@ namespace Keepsuit\LaravelTemporal\Contracts;
 use Keepsuit\LaravelTemporal\Builder\ActivityBuilder;
 use Keepsuit\LaravelTemporal\Builder\ChildWorkflowBuilder;
 use Keepsuit\LaravelTemporal\Builder\LocalActivityBuilder;
+use Keepsuit\LaravelTemporal\Builder\ScheduleBuilder;
 use Keepsuit\LaravelTemporal\Builder\WorkflowBuilder;
 
 interface Temporal
@@ -18,4 +19,6 @@ interface Temporal
     public function newWorkflow(): WorkflowBuilder;
 
     public function newChildWorkflow(): ChildWorkflowBuilder;
+
+    public function newSchedule(): ScheduleBuilder;
 }

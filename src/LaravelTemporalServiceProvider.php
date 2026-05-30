@@ -24,6 +24,8 @@ use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Temporal\Client\ClientOptions;
 use Temporal\Client\GRPC\ServiceClient;
 use Temporal\Client\GRPC\ServiceClientInterface;
+use Temporal\Client\ScheduleClient;
+use Temporal\Client\ScheduleClientInterface;
 use Temporal\Client\WorkflowClient;
 use Temporal\Client\WorkflowClientInterface;
 use Temporal\DataConverter\BinaryConverter;
@@ -100,6 +102,12 @@ class LaravelTemporalServiceProvider extends PackageServiceProvider
                 fn (string $className) => $app->make($className),
                 config('temporal.interceptors', [])
             ))
+        ));
+
+        $this->app->scoped(ScheduleClientInterface::class, fn (Application $app) => ScheduleClient::create(
+            serviceClient: $app->make(ServiceClientInterface::class),
+            options: (new ClientOptions)->withNamespace(config('temporal.namespace')),
+            converter: $app->make(DataConverterInterface::class),
         ));
     }
 
