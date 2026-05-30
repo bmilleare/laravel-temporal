@@ -13,6 +13,7 @@ use Keepsuit\LaravelTemporal\Commands\WorkCommand;
 use Keepsuit\LaravelTemporal\Commands\WorkflowMakeCommand;
 use Keepsuit\LaravelTemporal\DataConverter\LaravelPayloadConverter;
 use Keepsuit\LaravelTemporal\Support\DiscoverActivities;
+use Keepsuit\LaravelTemporal\Support\DiscoverSchedules;
 use Keepsuit\LaravelTemporal\Support\DiscoverWorkflows;
 use Keepsuit\LaravelTemporal\Support\ServerStateFile;
 use Keepsuit\LaravelTemporal\Testing\TemporalMocker;
@@ -108,6 +109,7 @@ class LaravelTemporalServiceProvider extends PackageServiceProvider
 
         $registry->registerWorkflows(...DiscoverWorkflows::within($app->path()));
         $registry->registerActivities(...DiscoverActivities::within($app->path()));
+        $registry->registerSchedules(...DiscoverSchedules::within($app->path()));
 
         return $registry;
     }

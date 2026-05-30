@@ -20,6 +20,11 @@ class TemporalRegistry implements Arrayable
     protected array $registeredActivities = [];
 
     /**
+     * @var array<array-key,class-string>
+     */
+    protected array $registeredSchedules = [];
+
+    /**
      * @param  class-string  ...$workflowClasses
      */
     public function registerWorkflows(string ...$workflowClasses): TemporalRegistry
@@ -35,6 +40,16 @@ class TemporalRegistry implements Arrayable
     public function registerActivities(string ...$activityClasses): TemporalRegistry
     {
         array_push($this->registeredActivities, ...$activityClasses);
+
+        return $this;
+    }
+
+    /**
+     * @param  class-string  ...$scheduleClasses
+     */
+    public function registerSchedules(string ...$scheduleClasses): TemporalRegistry
+    {
+        array_push($this->registeredSchedules, ...$scheduleClasses);
 
         return $this;
     }
@@ -56,9 +71,18 @@ class TemporalRegistry implements Arrayable
     }
 
     /**
+     * @return array<array-key,class-string>
+     */
+    public function schedules(): array
+    {
+        return array_unique($this->registeredSchedules);
+    }
+
+    /**
      * @return array{
      *     workflows:array<array-key,class-string>,
-     *     activities:array<array-key,class-string>
+     *     activities:array<array-key,class-string>,
+     *     schedules:array<array-key,class-string>
      * }
      */
     public function toArray(): array
@@ -66,6 +90,7 @@ class TemporalRegistry implements Arrayable
         return [
             'workflows' => $this->workflows(),
             'activities' => $this->activities(),
+            'schedules' => $this->schedules(),
         ];
     }
 }
