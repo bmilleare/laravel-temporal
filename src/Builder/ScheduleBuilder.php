@@ -27,6 +27,8 @@ class ScheduleBuilder
 
     protected ?StartWorkflowAction $action = null;
 
+    protected ?string $workflowId = null;
+
     protected SchedulePolicies $policies;
 
     protected ScheduleState $state;
@@ -127,6 +129,19 @@ class ScheduleBuilder
         if ($args !== []) {
             $self->action = $self->action->withInput($args);
         }
+
+        return $self;
+    }
+
+    /**
+     * Set the base workflow id for started executions. Defaults to the schedule
+     * id. Temporal appends the nominal scheduled time to each started run.
+     */
+    public function withWorkflowId(string $workflowId): self
+    {
+        $self = clone $this;
+
+        $self->workflowId = $workflowId;
 
         return $self;
     }
@@ -245,7 +260,13 @@ class ScheduleBuilder
             ->withState($this->state);
 
         if ($this->action !== null) {
-            $schedule = $schedule->withAction($this->action);
+            // Pin a deterministic base workflow id so the same definition hashes
+            // consistently across sync runs (the SDK otherwise assigns a random
+            // UUID per build). Precedence: explicit id, then schedule id, then
+            // workflow type name.
+            $workflowId = $this->workflowId ?? $this->id ?? $this->action->workflowType->name;
+
+            $schedule = $schedule->withAction($this->action->withWorkflowId($workflowId));
         }
 
         return $schedule;

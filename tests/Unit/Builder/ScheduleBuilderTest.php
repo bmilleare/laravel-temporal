@@ -121,3 +121,20 @@ it('targets the configured task queue for the workflow action and allows overrid
 
     expect($override->action->taskQueue->name)->toBe('other-queue');
 });
+
+it('defaults the workflow id to the schedule id and allows overriding it', function () {
+    $default = ScheduleBuilder::new()
+        ->id('reports')
+        ->startWorkflow(DemoWorkflowInterface::class)
+        ->build();
+
+    expect($default->action->workflowId)->toBe('reports');
+
+    $explicit = ScheduleBuilder::new()
+        ->id('reports')
+        ->startWorkflow(DemoWorkflowInterface::class)
+        ->withWorkflowId('custom-id')
+        ->build();
+
+    expect($explicit->action->workflowId)->toBe('custom-id');
+});
