@@ -16,6 +16,7 @@ use Temporal\Activity\ActivityInterface;
 use Temporal\Activity\LocalActivityInterface;
 use Temporal\Client\ClientOptions;
 use Temporal\Client\GRPC\ServiceClientInterface;
+use Temporal\Client\ScheduleClientInterface;
 use Temporal\Client\WorkflowClientInterface;
 use Temporal\DataConverter\DataConverterInterface;
 use Temporal\Interceptor\SimplePipelineProvider;
@@ -34,6 +35,7 @@ class TemporalFake extends Temporal
     {
         $this->temporalMocker = $this->app->make(TemporalMocker::class);
         $this->swapWorkflowClient();
+        $this->swapScheduleClient();
     }
 
     protected function swapWorkflowClient(): void
@@ -47,6 +49,40 @@ class TemporalFake extends Temporal
                 config('temporal.interceptors', [])
             ))
         ));
+    }
+
+    protected function swapScheduleClient(): void
+    {
+        $this->app->instance(ScheduleClientInterface::class, new FakeScheduleClient(
+            serviceClient: $this->app->make(ServiceClientInterface::class),
+            options: (new ClientOptions)->withNamespace(config('temporal.namespace')),
+            converter: $this->app->make(DataConverterInterface::class),
+        ));
+    }
+
+    public function assertScheduleCreated(?string $scheduleId = null, ?Closure $callback = null): void
+    {
+        PHPUnit::assertTrue(
+            $this->schedulesCreated($scheduleId, $callback)->count() > 0,
+            sprintf('The expected schedule [%s] was not created.', $scheduleId ?? 'any'),
+        );
+    }
+
+    public function assertScheduleNotCreated(?string $scheduleId = null, ?Closure $callback = null): void
+    {
+        PHPUnit::assertCount(
+            0, $this->schedulesCreated($scheduleId, $callback),
+            sprintf('The unexpected schedule [%s] was created.', $scheduleId ?? 'any'),
+        );
+    }
+
+    protected function schedulesCreated(?string $scheduleId, ?Closure $callback): Collection
+    {
+        $client = $this->app->make(ScheduleClientInterface::class);
+
+        return collect($client instanceof FakeScheduleClient ? $client->createdSchedules() : [])
+            ->when($scheduleId !== null, fn (Collection $records) => $records->filter(fn (array $record) => $record['id'] === $scheduleId))
+            ->when($callback !== null, fn (Collection $records) => $records->filter(fn (array $record) => $callback($record['schedule'], $record['options'])));
     }
 
     public function mockWorkflows(array $workflowMocks, ?string $taskQueue = null): void

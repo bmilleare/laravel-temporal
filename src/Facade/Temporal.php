@@ -39,6 +39,8 @@ use Temporal\Workflow;
  * @method static void assertActivityDispatched(string|array $activityName, Closure|int|null $callback = null)
  * @method static void assertActivityDispatchedTimes(string|array $activityName, int $times = 1, Closure|null $callback = null)
  * @method static void assertActivityNotDispatched(string|array $activityName, Closure|null $callback = null)
+ * @method static void assertScheduleCreated(?string $scheduleId = null, Closure|null $callback = null)
+ * @method static void assertScheduleNotCreated(?string $scheduleId = null, Closure|null $callback = null)
  */
 class Temporal extends Facade
 {
