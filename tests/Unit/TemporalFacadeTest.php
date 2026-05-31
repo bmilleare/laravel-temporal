@@ -3,9 +3,12 @@
 use Keepsuit\LaravelTemporal\Builder\ActivityBuilder;
 use Keepsuit\LaravelTemporal\Builder\ChildWorkflowBuilder;
 use Keepsuit\LaravelTemporal\Builder\LocalActivityBuilder;
+use Keepsuit\LaravelTemporal\Builder\ScheduleBuilder;
 use Keepsuit\LaravelTemporal\Builder\WorkflowBuilder;
 use Keepsuit\LaravelTemporal\Temporal;
 use Keepsuit\LaravelTemporal\Testing\Fakes\TemporalFake;
+use Temporal\Client\ScheduleClient;
+use Temporal\Client\ScheduleClientInterface;
 
 it('can resolve the temporal facade', function () {
     expect(Keepsuit\LaravelTemporal\Facade\Temporal::getFacadeRoot())
@@ -36,4 +39,15 @@ it('can provide builders', function () {
 
     expect(Keepsuit\LaravelTemporal\Facade\Temporal::newLocalActivity())
         ->toBeInstanceOf(LocalActivityBuilder::class);
+
+    expect(Keepsuit\LaravelTemporal\Facade\Temporal::newSchedule())
+        ->toBeInstanceOf(ScheduleBuilder::class);
+});
+
+it('can resolve the schedule client', function () {
+    expect(app(ScheduleClientInterface::class))
+        ->toBeInstanceOf(ScheduleClient::class);
+
+    expect(Keepsuit\LaravelTemporal\Facade\Temporal::scheduleClient())
+        ->toBeInstanceOf(ScheduleClient::class);
 });

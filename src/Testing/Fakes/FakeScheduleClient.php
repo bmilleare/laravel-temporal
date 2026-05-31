@@ -1,0 +1,115 @@
+<?php
+
+namespace Keepsuit\LaravelTemporal\Testing\Fakes;
+
+use Spiral\Attributes\AttributeReader;
+use Temporal\Client\ClientOptions;
+use Temporal\Client\Common\ClientContextTrait;
+use Temporal\Client\Common\Paginator;
+use Temporal\Client\GRPC\ServiceClientInterface;
+use Temporal\Client\Schedule\Info\ScheduleListEntry;
+use Temporal\Client\Schedule\Schedule;
+use Temporal\Client\Schedule\ScheduleHandle;
+use Temporal\Client\Schedule\ScheduleOptions;
+use Temporal\Client\ScheduleClientInterface;
+use Temporal\DataConverter\DataConverter;
+use Temporal\DataConverter\DataConverterInterface;
+use Temporal\Internal\Marshaller\Mapper\AttributeMapperFactory;
+use Temporal\Internal\Marshaller\Marshaller;
+use Temporal\Internal\Marshaller\MarshallerInterface;
+use Temporal\Internal\Marshaller\ProtoToArrayConverter;
+
+/**
+ * In-memory schedule client used by Temporal::fake(). ScheduleClient is final
+ * so this implements the interface directly, recording createSchedule() calls
+ * (for assertScheduleCreated) instead of hitting the server.
+ *
+ * Scope is deliberately limited to create-recording: listSchedules() always
+ * returns empty, and because the SDK's ScheduleHandle is final it cannot be
+ * faked, so handle operations (update/delete/pause/trigger) are not isolated
+ * under fake() — exercise those against a real server (see WithTemporal).
+ */
+class FakeScheduleClient implements ScheduleClientInterface
+{
+    use ClientContextTrait;
+
+    protected ClientOptions $clientOptions;
+
+    protected DataConverterInterface $converter;
+
+    protected MarshallerInterface $marshaller;
+
+    protected ProtoToArrayConverter $protoConverter;
+
+    /**
+     * @var list<array{id: ?string, schedule: Schedule, options: ScheduleOptions}>
+     */
+    protected array $created = [];
+
+    public function __construct(
+        ServiceClientInterface $serviceClient,
+        ?ClientOptions $options = null,
+        ?DataConverterInterface $converter = null,
+    ) {
+        $this->clientOptions = $options ?? new ClientOptions;
+        $this->converter = $converter ?? DataConverter::createDefault();
+        $this->marshaller = new Marshaller(new AttributeMapperFactory(new AttributeReader));
+        $this->protoConverter = new ProtoToArrayConverter($this->converter);
+        $this->client = $serviceClient;
+    }
+
+    public function createSchedule(
+        Schedule $schedule,
+        ?ScheduleOptions $options = null,
+        ?string $scheduleId = null,
+    ): ScheduleHandle {
+        // Normalize options the same way the real ScheduleClient does, so the
+        // assertion callback always receives a ScheduleOptions instance (never
+        // null) even when createSchedule() is called without options.
+        $this->created[] = [
+            'id' => $scheduleId,
+            'schedule' => $schedule,
+            'options' => $options ?? ScheduleOptions::new(),
+        ];
+
+        $id = $scheduleId !== null && $scheduleId !== ''
+            ? $scheduleId
+            : 'fake-schedule-'.count($this->created);
+
+        return $this->getHandle($id);
+    }
+
+    public function getHandle(string $scheduleID, ?string $namespace = null): ScheduleHandle
+    {
+        return new ScheduleHandle(
+            $this->client,
+            $this->clientOptions,
+            $this->converter,
+            $this->marshaller,
+            $this->protoConverter,
+            $namespace ?? $this->clientOptions->namespace,
+            $scheduleID,
+        );
+    }
+
+    public function listSchedules(?string $namespace = null, int $pageSize = 0, string $query = ''): Paginator
+    {
+        return Paginator::createFromGenerator($this->emptyPages(), static fn (): int => 0);
+    }
+
+    /**
+     * @return \Generator<int, list<ScheduleListEntry>>
+     */
+    protected function emptyPages(): \Generator
+    {
+        yield from [];
+    }
+
+    /**
+     * @return list<array{id: ?string, schedule: Schedule, options: ScheduleOptions}>
+     */
+    public function createdSchedules(): array
+    {
+        return $this->created;
+    }
+}

@@ -8,11 +8,18 @@ use Illuminate\Support\Str;
 use Keepsuit\LaravelTemporal\Commands\ActivityMakeCommand;
 use Keepsuit\LaravelTemporal\Commands\InstallCommand;
 use Keepsuit\LaravelTemporal\Commands\InterceptorMakeCommand;
+use Keepsuit\LaravelTemporal\Commands\ScheduleListCommand;
+use Keepsuit\LaravelTemporal\Commands\ScheduleMakeCommand;
+use Keepsuit\LaravelTemporal\Commands\SchedulePauseCommand;
+use Keepsuit\LaravelTemporal\Commands\ScheduleSyncCommand;
+use Keepsuit\LaravelTemporal\Commands\ScheduleTriggerCommand;
+use Keepsuit\LaravelTemporal\Commands\ScheduleUnpauseCommand;
 use Keepsuit\LaravelTemporal\Commands\TestServerCommand;
 use Keepsuit\LaravelTemporal\Commands\WorkCommand;
 use Keepsuit\LaravelTemporal\Commands\WorkflowMakeCommand;
 use Keepsuit\LaravelTemporal\DataConverter\LaravelPayloadConverter;
 use Keepsuit\LaravelTemporal\Support\DiscoverActivities;
+use Keepsuit\LaravelTemporal\Support\DiscoverSchedules;
 use Keepsuit\LaravelTemporal\Support\DiscoverWorkflows;
 use Keepsuit\LaravelTemporal\Support\ServerStateFile;
 use Keepsuit\LaravelTemporal\Testing\TemporalMocker;
@@ -23,6 +30,8 @@ use Spatie\LaravelPackageTools\PackageServiceProvider;
 use Temporal\Client\ClientOptions;
 use Temporal\Client\GRPC\ServiceClient;
 use Temporal\Client\GRPC\ServiceClientInterface;
+use Temporal\Client\ScheduleClient;
+use Temporal\Client\ScheduleClientInterface;
 use Temporal\Client\WorkflowClient;
 use Temporal\Client\WorkflowClientInterface;
 use Temporal\DataConverter\BinaryConverter;
@@ -47,6 +56,12 @@ class LaravelTemporalServiceProvider extends PackageServiceProvider
                 WorkflowMakeCommand::class,
                 ActivityMakeCommand::class,
                 InterceptorMakeCommand::class,
+                ScheduleSyncCommand::class,
+                ScheduleListCommand::class,
+                ScheduleTriggerCommand::class,
+                SchedulePauseCommand::class,
+                ScheduleUnpauseCommand::class,
+                ScheduleMakeCommand::class,
             ]);
     }
 
@@ -100,6 +115,12 @@ class LaravelTemporalServiceProvider extends PackageServiceProvider
                 config('temporal.interceptors', [])
             ))
         ));
+
+        $this->app->scoped(ScheduleClientInterface::class, fn (Application $app) => ScheduleClient::create(
+            serviceClient: $app->make(ServiceClientInterface::class),
+            options: (new ClientOptions)->withNamespace(config('temporal.namespace')),
+            converter: $app->make(DataConverterInterface::class),
+        ));
     }
 
     protected function initTemporalRegistry(Application $app): TemporalRegistry
@@ -108,6 +129,7 @@ class LaravelTemporalServiceProvider extends PackageServiceProvider
 
         $registry->registerWorkflows(...DiscoverWorkflows::within($app->path()));
         $registry->registerActivities(...DiscoverActivities::within($app->path()));
+        $registry->registerSchedules(...DiscoverSchedules::within($app->path()));
 
         return $registry;
     }

@@ -9,12 +9,14 @@ use Illuminate\Support\Facades\Facade;
 use Keepsuit\LaravelTemporal\Builder\ActivityBuilder;
 use Keepsuit\LaravelTemporal\Builder\ChildWorkflowBuilder;
 use Keepsuit\LaravelTemporal\Builder\LocalActivityBuilder;
+use Keepsuit\LaravelTemporal\Builder\ScheduleBuilder;
 use Keepsuit\LaravelTemporal\Builder\WorkflowBuilder;
 use Keepsuit\LaravelTemporal\TemporalRegistry;
 use Keepsuit\LaravelTemporal\Testing\ActivityMockBuilder;
 use Keepsuit\LaravelTemporal\Testing\Fakes\TemporalFake;
 use Keepsuit\LaravelTemporal\Testing\TemporalTestingEnvironment;
 use Keepsuit\LaravelTemporal\Testing\WorkflowMockBuilder;
+use Temporal\Client\ScheduleClientInterface;
 use Temporal\Client\WorkflowClientInterface;
 use Temporal\Worker\WorkerOptions;
 use Temporal\Workflow;
@@ -24,6 +26,7 @@ use Temporal\Workflow;
  * @method static ChildWorkflowBuilder newChildWorkflow()
  * @method static ActivityBuilder newActivity()
  * @method static LocalActivityBuilder newLocalActivity()
+ * @method static ScheduleBuilder newSchedule()
  * @method static void buildWorkerOptionsUsing(Closure $callback)
  * @method static WorkerOptions|null buildWorkerOptions(string $taskQueue)
  * @method static void mockWorkflows(array $workflowMocks, ?string $taskQueue = null)
@@ -36,6 +39,8 @@ use Temporal\Workflow;
  * @method static void assertActivityDispatched(string|array $activityName, Closure|int|null $callback = null)
  * @method static void assertActivityDispatchedTimes(string|array $activityName, int $times = 1, Closure|null $callback = null)
  * @method static void assertActivityNotDispatched(string|array $activityName, Closure|null $callback = null)
+ * @method static void assertScheduleCreated(?string $scheduleId = null, Closure|null $callback = null)
+ * @method static void assertScheduleNotCreated(?string $scheduleId = null, Closure|null $callback = null)
  */
 class Temporal extends Facade
 {
@@ -108,5 +113,10 @@ class Temporal extends Facade
     public static function workflowClient(): WorkflowClientInterface
     {
         return static::$app->make(WorkflowClientInterface::class);
+    }
+
+    public static function scheduleClient(): ScheduleClientInterface
+    {
+        return static::$app->make(ScheduleClientInterface::class);
     }
 }

@@ -8,6 +8,7 @@ use Closure;
 use Keepsuit\LaravelTemporal\Builder\ActivityBuilder;
 use Keepsuit\LaravelTemporal\Builder\ChildWorkflowBuilder;
 use Keepsuit\LaravelTemporal\Builder\LocalActivityBuilder;
+use Keepsuit\LaravelTemporal\Builder\ScheduleBuilder;
 use Keepsuit\LaravelTemporal\Builder\WorkflowBuilder;
 use Temporal\Worker\WorkerOptions;
 
@@ -36,6 +37,11 @@ class Temporal implements Contracts\Temporal
     public function newChildWorkflow(): ChildWorkflowBuilder
     {
         return ChildWorkflowBuilder::new();
+    }
+
+    public function newSchedule(): ScheduleBuilder
+    {
+        return ScheduleBuilder::new();
     }
 
     public function buildWorkerOptions(string $taskQueue): WorkerOptions

@@ -346,6 +346,92 @@ class AppServiceProvider extends ServiceProvider
 }
 ```
 
+## Schedules
+
+[Temporal Schedules](https://docs.temporal.io/develop/php/schedules) run a workflow on a recurring calendar or interval and are the modern replacement for the legacy `withCronSchedule()`. This package manages schedules **declaratively**, much like database migrations: you describe the desired schedules in code and sync them to the server.
+
+### Define a schedule
+
+Create a schedule definition with the `temporal:make:schedule {name}` command. Definitions live in `app/Temporal/Schedules` and are automatically discovered.
+
+```php
+use Keepsuit\LaravelTemporal\Builder\ScheduleBuilder;
+use Keepsuit\LaravelTemporal\Contracts\ScheduleDefinition;
+use Temporal\Client\Schedule\Policy\ScheduleOverlapPolicy;
+
+class DailyReportSchedule implements ScheduleDefinition
+{
+    public function configure(ScheduleBuilder $schedule): ScheduleBuilder
+    {
+        return $schedule
+            ->id('daily-report')          // optional for discovered definitions; defaults to a kebab-case of the definition class name
+            ->cron('0 9 * * *')           // or ->interval(CarbonInterval::hour())
+            // Definitions are built at sync time, so workflow args must be static
+            // or config-derived — never request-scoped.
+            ->startWorkflow(GenerateReportWorkflowInterface::class, ['acme'])
+            ->withOverlapPolicy(ScheduleOverlapPolicy::Skip)
+            ->pauseOnFailure();
+    }
+}
+```
+
+The builder exposes the full schedule surface:
+
+- **Spec** (when): `cron()`, `interval()`, `jitter()`, `startAt()`, `endAt()`, `timezone()`
+- **Action** (what): `startWorkflow()` (the workflow type is resolved from the class), `withWorkflowId()`
+- **Policy**: `withOverlapPolicy()`, `withCatchupWindow()`, `pauseOnFailure()`
+- **State**: `paused()`, `note()`, `limitedActions()`, `remainingActions()`
+- **Options**: `withMemo()`, `withSearchAttributes()`, `triggerImmediately()`
+
+### Sync schedules to the server
+
+```bash
+php artisan temporal:schedule:sync            # create/update declared schedules
+php artisan temporal:schedule:sync --dry-run  # preview the plan without applying it
+php artisan temporal:schedule:sync --prune    # also delete managed schedules that no longer have a definition
+```
+
+Sync is idempotent: unchanged schedules are skipped. Every schedule this package creates is tagged in its memo with an ownership marker and a content hash of its definition (covering the spec, action, policies, state, and the declared `withMemo()` / `withSearchAttributes()`). On the next sync that hash is compared to the freshly computed one to detect drift.
+
+Because Temporal's update API cannot rewrite a schedule's memo, a changed schedule is reconciled by **deleting and recreating** it (which restamps the hash and applies the full declared definition). This resets server-side run state for that schedule, and `triggerImmediately()` will fire again on recreate — the declaration is the source of truth.
+
+Ownership is respected throughout: `--prune` only ever removes schedules this package created, and if a declared id collides with a schedule created by another tool, sync leaves it untouched and reports it as a conflict (rename your definition or adopt the existing schedule). A duplicate id declared by two definitions fails the command.
+
+### Manage schedules
+
+```bash
+php artisan temporal:schedule:list [--managed]
+php artisan temporal:schedule:trigger {id} [--overlap=Skip]
+php artisan temporal:schedule:pause {id} [--note="..."]
+php artisan temporal:schedule:unpause {id} [--note="..."]
+```
+
+For anything beyond these commands you can reach the underlying SDK client with `Temporal::scheduleClient()`.
+
+### Testing schedules
+
+`Temporal::fake()` records schedule **creation** so you can assert it without a server. Its scope is limited to creates: the faked client lists no schedules and does not isolate handle operations (update/pause/trigger/delete), so exercise those — and the full reconcile/prune flow of `schedule:sync` — against a real server (see [Testing utilities](#testing-utilities)). Under `fake()`, `schedule:sync` sees an empty server and therefore only ever takes the create path.
+
+```php
+use Temporal\Client\Schedule\Schedule;
+
+Temporal::fake();
+
+// ...code that calls scheduleClient()->createSchedule() (e.g. a first-time schedule:sync)...
+
+Temporal::assertScheduleCreated('daily-report');
+Temporal::assertScheduleNotCreated('weekly-report');
+Temporal::assertScheduleCreated(callback: fn (Schedule $schedule) => $schedule->spec->cronStringList === ['0 9 * * *']);
+```
+
+The assertion callback receives the `Schedule` as its first argument and the `ScheduleOptions` (memo, search attributes, trigger-immediately flag) as an optional second argument:
+
+```php
+use Temporal\Client\Schedule\ScheduleOptions;
+
+Temporal::assertScheduleCreated(callback: fn (Schedule $schedule, ScheduleOptions $options) => $options->triggerImmediately);
+```
+
 ## Testing utilities
 
 In order to test workflows end-to-end, you need a temporal server running.
