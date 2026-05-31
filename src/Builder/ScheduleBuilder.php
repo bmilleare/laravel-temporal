@@ -6,6 +6,7 @@ namespace Keepsuit\LaravelTemporal\Builder;
 
 use DateInterval;
 use DateTimeInterface;
+use InvalidArgumentException;
 use Spiral\Attributes\AttributeReader;
 use Stringable;
 use Temporal\Client\Schedule\Action\StartWorkflowAction;
@@ -50,6 +51,10 @@ class ScheduleBuilder
 
     public function id(string $id): self
     {
+        if (trim($id) === '') {
+            throw new InvalidArgumentException('Schedule id cannot be empty.');
+        }
+
         $self = clone $this;
 
         $self->id = $id;

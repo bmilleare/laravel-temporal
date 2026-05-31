@@ -1,14 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Keepsuit\LaravelTemporal\Commands;
 
-use Illuminate\Console\Command;
+use InvalidArgumentException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Temporal\Client\Schedule\Policy\ScheduleOverlapPolicy;
-use Temporal\Client\ScheduleClientInterface;
+use Temporal\Client\Schedule\ScheduleHandle;
 
 #[AsCommand('temporal:schedule:trigger')]
-class ScheduleTriggerCommand extends Command
+class ScheduleTriggerCommand extends ScheduleActionCommand
 {
     protected $signature = 'temporal:schedule:trigger
                         {id : The schedule id to trigger}
@@ -16,32 +18,31 @@ class ScheduleTriggerCommand extends Command
 
     protected $description = 'Trigger an immediate run of a Temporal schedule';
 
-    public function handle(ScheduleClientInterface $client): int
+    protected function performAction(ScheduleHandle $handle, string $id): string
     {
-        $id = (string) $this->argument('id');
-        if ($id === '') {
-            $this->error('A schedule id is required.');
+        $handle->trigger($this->overlapPolicy());
 
-            return self::FAILURE;
-        }
-
-        $client->getHandle($id)->trigger($this->overlapPolicy());
-
-        $this->info(sprintf('Triggered schedule [%s].', $id));
-
-        return self::SUCCESS;
+        return sprintf('Triggered schedule [%s].', $id);
     }
 
     protected function overlapPolicy(): ScheduleOverlapPolicy
     {
-        return match (strtolower((string) $this->option('overlap'))) {
+        $overlap = $this->option('overlap');
+        if ($overlap === null || $overlap === '') {
+            return ScheduleOverlapPolicy::Unspecified;
+        }
+
+        return match (strtolower((string) $overlap)) {
             'skip' => ScheduleOverlapPolicy::Skip,
             'bufferone' => ScheduleOverlapPolicy::BufferOne,
             'bufferall' => ScheduleOverlapPolicy::BufferAll,
             'cancelother' => ScheduleOverlapPolicy::CancelOther,
             'terminateother' => ScheduleOverlapPolicy::TerminateOther,
             'allowall' => ScheduleOverlapPolicy::AllowAll,
-            default => ScheduleOverlapPolicy::Unspecified,
+            default => throw new InvalidArgumentException(sprintf(
+                'Unknown overlap policy [%s]. Allowed: Skip, BufferOne, BufferAll, CancelOther, TerminateOther, AllowAll.',
+                (string) $overlap,
+            )),
         };
     }
 }

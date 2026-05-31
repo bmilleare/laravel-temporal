@@ -1,36 +1,28 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Keepsuit\LaravelTemporal\Commands;
 
-use Illuminate\Console\Command;
+use Keepsuit\LaravelTemporal\Commands\Concerns\ResolvesScheduleNote;
 use Symfony\Component\Console\Attribute\AsCommand;
-use Temporal\Client\ScheduleClientInterface;
+use Temporal\Client\Schedule\ScheduleHandle;
 
 #[AsCommand('temporal:schedule:pause')]
-class SchedulePauseCommand extends Command
+class SchedulePauseCommand extends ScheduleActionCommand
 {
+    use ResolvesScheduleNote;
+
     protected $signature = 'temporal:schedule:pause
                         {id : The schedule id to pause}
                         {--note= : An informative note stored on the schedule}';
 
     protected $description = 'Pause a Temporal schedule';
 
-    public function handle(ScheduleClientInterface $client): int
+    protected function performAction(ScheduleHandle $handle, string $id): string
     {
-        $id = (string) $this->argument('id');
-        if ($id === '') {
-            $this->error('A schedule id is required.');
+        $handle->pause($this->noteOption('Paused via PHP SDK'));
 
-            return self::FAILURE;
-        }
-
-        $note = $this->option('note');
-        $note = is_string($note) ? $note : 'Paused via PHP SDK';
-
-        $client->getHandle($id)->pause($note);
-
-        $this->info(sprintf('Paused schedule [%s].', $id));
-
-        return self::SUCCESS;
+        return sprintf('Paused schedule [%s].', $id);
     }
 }
