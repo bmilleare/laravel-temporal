@@ -364,7 +364,7 @@ class DailyReportSchedule implements ScheduleDefinition
     public function configure(ScheduleBuilder $schedule): ScheduleBuilder
     {
         return $schedule
-            ->id('daily-report')          // optional, defaults to a kebab-case of the class name
+            ->id('daily-report')          // optional for discovered definitions; defaults to a kebab-case of the definition class name
             ->cron('0 9 * * *')           // or ->interval(CarbonInterval::hour())
             ->startWorkflow(GenerateReportWorkflowInterface::class, [$tenantId])
             ->withOverlapPolicy(ScheduleOverlapPolicy::Skip)
@@ -375,7 +375,7 @@ class DailyReportSchedule implements ScheduleDefinition
 
 The builder exposes the full schedule surface:
 
-- **Spec** (when): `cron()`, `interval()`, `calendar()`, `jitter()`, `startAt()`, `endAt()`, `timezone()`
+- **Spec** (when): `cron()`, `interval()`, `jitter()`, `startAt()`, `endAt()`, `timezone()`
 - **Action** (what): `startWorkflow()` (the workflow type is resolved from the class), `withWorkflowId()`
 - **Policy**: `withOverlapPolicy()`, `withCatchupWindow()`, `pauseOnFailure()`
 - **State**: `paused()`, `note()`, `limitedActions()`, `remainingActions()`
@@ -416,6 +416,14 @@ Temporal::fake();
 Temporal::assertScheduleCreated('daily-report');
 Temporal::assertScheduleNotCreated('weekly-report');
 Temporal::assertScheduleCreated(callback: fn (Schedule $schedule) => $schedule->spec->cronStringList === ['0 9 * * *']);
+```
+
+The assertion callback receives the `Schedule` as its first argument and the `ScheduleOptions` (memo, search attributes, trigger-immediately flag) as an optional second argument:
+
+```php
+use Temporal\Client\Schedule\ScheduleOptions;
+
+Temporal::assertScheduleCreated(callback: fn (Schedule $schedule, ScheduleOptions $options) => $options->triggerImmediately);
 ```
 
 ## Testing utilities
