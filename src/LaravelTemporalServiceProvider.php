@@ -8,7 +8,11 @@ use Illuminate\Support\Str;
 use Keepsuit\LaravelTemporal\Commands\ActivityMakeCommand;
 use Keepsuit\LaravelTemporal\Commands\InstallCommand;
 use Keepsuit\LaravelTemporal\Commands\InterceptorMakeCommand;
+use Keepsuit\LaravelTemporal\Commands\ScheduleListCommand;
+use Keepsuit\LaravelTemporal\Commands\SchedulePauseCommand;
 use Keepsuit\LaravelTemporal\Commands\ScheduleSyncCommand;
+use Keepsuit\LaravelTemporal\Commands\ScheduleTriggerCommand;
+use Keepsuit\LaravelTemporal\Commands\ScheduleUnpauseCommand;
 use Keepsuit\LaravelTemporal\Commands\TestServerCommand;
 use Keepsuit\LaravelTemporal\Commands\WorkCommand;
 use Keepsuit\LaravelTemporal\Commands\WorkflowMakeCommand;
@@ -52,6 +56,10 @@ class LaravelTemporalServiceProvider extends PackageServiceProvider
                 ActivityMakeCommand::class,
                 InterceptorMakeCommand::class,
                 ScheduleSyncCommand::class,
+                ScheduleListCommand::class,
+                ScheduleTriggerCommand::class,
+                SchedulePauseCommand::class,
+                ScheduleUnpauseCommand::class,
             ]);
     }
 
