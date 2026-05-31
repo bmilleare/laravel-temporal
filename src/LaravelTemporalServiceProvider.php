@@ -9,6 +9,7 @@ use Keepsuit\LaravelTemporal\Commands\ActivityMakeCommand;
 use Keepsuit\LaravelTemporal\Commands\InstallCommand;
 use Keepsuit\LaravelTemporal\Commands\InterceptorMakeCommand;
 use Keepsuit\LaravelTemporal\Commands\ScheduleListCommand;
+use Keepsuit\LaravelTemporal\Commands\ScheduleMakeCommand;
 use Keepsuit\LaravelTemporal\Commands\SchedulePauseCommand;
 use Keepsuit\LaravelTemporal\Commands\ScheduleSyncCommand;
 use Keepsuit\LaravelTemporal\Commands\ScheduleTriggerCommand;
@@ -60,6 +61,7 @@ class LaravelTemporalServiceProvider extends PackageServiceProvider
                 ScheduleTriggerCommand::class,
                 SchedulePauseCommand::class,
                 ScheduleUnpauseCommand::class,
+                ScheduleMakeCommand::class,
             ]);
     }
 

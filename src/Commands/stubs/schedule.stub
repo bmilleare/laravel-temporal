@@ -1,0 +1,17 @@
+<?php
+
+namespace {{ namespace }};
+
+use Keepsuit\LaravelTemporal\Builder\ScheduleBuilder;
+use Keepsuit\LaravelTemporal\Contracts\ScheduleDefinition;
+
+class {{ class }} implements ScheduleDefinition
+{
+    public function configure(ScheduleBuilder $schedule): ScheduleBuilder
+    {
+        return $schedule
+            ->cron('0 0 * * *')
+            // ->startWorkflow(\App\Temporal\Workflows\YourWorkflowInterface::class)
+        ;
+    }
+}
