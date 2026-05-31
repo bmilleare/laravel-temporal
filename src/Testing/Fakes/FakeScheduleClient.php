@@ -22,8 +22,12 @@ use Temporal\Internal\Marshaller\ProtoToArrayConverter;
 /**
  * In-memory schedule client used by Temporal::fake(). ScheduleClient is final
  * so this implements the interface directly, recording createSchedule() calls
- * instead of hitting the server. Handle operations are not exercised under
- * fake() — they are covered by integration tests.
+ * (for assertScheduleCreated) instead of hitting the server.
+ *
+ * Scope is deliberately limited to create-recording: listSchedules() always
+ * returns empty, and because the SDK's ScheduleHandle is final it cannot be
+ * faked, so handle operations (update/delete/pause/trigger) are not isolated
+ * under fake() — exercise those against a real server (see WithTemporal).
  */
 class FakeScheduleClient implements ScheduleClientInterface
 {
@@ -38,7 +42,7 @@ class FakeScheduleClient implements ScheduleClientInterface
     protected ProtoToArrayConverter $protoConverter;
 
     /**
-     * @var list<array{id: ?string, schedule: Schedule, options: ?ScheduleOptions}>
+     * @var list<array{id: ?string, schedule: Schedule, options: ScheduleOptions}>
      */
     protected array $created = [];
 
@@ -59,10 +63,13 @@ class FakeScheduleClient implements ScheduleClientInterface
         ?ScheduleOptions $options = null,
         ?string $scheduleId = null,
     ): ScheduleHandle {
+        // Normalize options the same way the real ScheduleClient does, so the
+        // assertion callback always receives a ScheduleOptions instance (never
+        // null) even when createSchedule() is called without options.
         $this->created[] = [
             'id' => $scheduleId,
             'schedule' => $schedule,
-            'options' => $options,
+            'options' => $options ?? ScheduleOptions::new(),
         ];
 
         $id = $scheduleId !== null && $scheduleId !== ''
@@ -99,7 +106,7 @@ class FakeScheduleClient implements ScheduleClientInterface
     }
 
     /**
-     * @return list<array{id: ?string, schedule: Schedule, options: ?ScheduleOptions}>
+     * @return list<array{id: ?string, schedule: Schedule, options: ScheduleOptions}>
      */
     public function createdSchedules(): array
     {

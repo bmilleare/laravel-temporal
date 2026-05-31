@@ -366,7 +366,9 @@ class DailyReportSchedule implements ScheduleDefinition
         return $schedule
             ->id('daily-report')          // optional for discovered definitions; defaults to a kebab-case of the definition class name
             ->cron('0 9 * * *')           // or ->interval(CarbonInterval::hour())
-            ->startWorkflow(GenerateReportWorkflowInterface::class, [$tenantId])
+            // Definitions are built at sync time, so workflow args must be static
+            // or config-derived — never request-scoped.
+            ->startWorkflow(GenerateReportWorkflowInterface::class, ['acme'])
             ->withOverlapPolicy(ScheduleOverlapPolicy::Skip)
             ->pauseOnFailure();
     }
@@ -389,7 +391,11 @@ php artisan temporal:schedule:sync --dry-run  # preview the plan without applyin
 php artisan temporal:schedule:sync --prune    # also delete managed schedules that no longer have a definition
 ```
 
-Sync is idempotent: unchanged schedules are skipped. Every schedule this package creates is tagged in its memo, so `--prune` only ever removes schedules created by this package — schedules created by other tools are never touched.
+Sync is idempotent: unchanged schedules are skipped. Every schedule this package creates is tagged in its memo with an ownership marker and a content hash of its definition (covering the spec, action, policies, state, and the declared `withMemo()` / `withSearchAttributes()`). On the next sync that hash is compared to the freshly computed one to detect drift.
+
+Because Temporal's update API cannot rewrite a schedule's memo, a changed schedule is reconciled by **deleting and recreating** it (which restamps the hash and applies the full declared definition). This resets server-side run state for that schedule, and `triggerImmediately()` will fire again on recreate — the declaration is the source of truth.
+
+Ownership is respected throughout: `--prune` only ever removes schedules this package created, and if a declared id collides with a schedule created by another tool, sync leaves it untouched and reports it as a conflict (rename your definition or adopt the existing schedule). A duplicate id declared by two definitions fails the command.
 
 ### Manage schedules
 
@@ -404,14 +410,14 @@ For anything beyond these commands you can reach the underlying SDK client with 
 
 ### Testing schedules
 
-`Temporal::fake()` records schedule creation so you can assert it without a server:
+`Temporal::fake()` records schedule **creation** so you can assert it without a server. Its scope is limited to creates: the faked client lists no schedules and does not isolate handle operations (update/pause/trigger/delete), so exercise those — and the full reconcile/prune flow of `schedule:sync` — against a real server (see [Testing utilities](#testing-utilities)). Under `fake()`, `schedule:sync` sees an empty server and therefore only ever takes the create path.
 
 ```php
 use Temporal\Client\Schedule\Schedule;
 
 Temporal::fake();
 
-// ...code that runs schedule:sync or calls scheduleClient()->createSchedule()...
+// ...code that calls scheduleClient()->createSchedule() (e.g. a first-time schedule:sync)...
 
 Temporal::assertScheduleCreated('daily-report');
 Temporal::assertScheduleNotCreated('weekly-report');
