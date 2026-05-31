@@ -22,9 +22,15 @@ final class ScheduleReconciler
 
         $update = [];
         $unchanged = [];
+        $conflicts = [];
 
         foreach (array_keys(array_intersect_key($desired, $existing)) as $id) {
-            if ($existing[$id]['hash'] === $desired[$id]) {
+            if (! $existing[$id]['managed']) {
+                // A desired id that already exists but is NOT owned by this
+                // package: never overwrite it. Surface it as a conflict so the
+                // operator can rename their definition or adopt the schedule.
+                $conflicts[] = $id;
+            } elseif ($existing[$id]['hash'] === $desired[$id]) {
                 $unchanged[] = $id;
             } else {
                 $update[] = $id;
@@ -46,6 +52,7 @@ final class ScheduleReconciler
             update: $update,
             unchanged: $unchanged,
             prunable: $prunable,
+            conflicts: $conflicts,
         );
     }
 }
