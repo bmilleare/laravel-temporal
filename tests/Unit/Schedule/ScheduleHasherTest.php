@@ -20,3 +20,19 @@ it('produces a different hash when the schedule differs', function () {
 
     expect(ScheduleHasher::hash($a))->not->toBe(ScheduleHasher::hash($b));
 });
+
+it('detects drift in the declarative memo and search attributes', function () {
+    $schedule = ScheduleBuilder::new()->id('x')->cron('0 9 * * *')->startWorkflow(DemoWorkflowInterface::class)->build();
+
+    $base = ScheduleHasher::hash($schedule);
+
+    expect(ScheduleHasher::hash($schedule, ['team' => 'data']))->not->toBe($base);
+    expect(ScheduleHasher::hash($schedule, [], ['Env' => 'prod']))->not->toBe($base);
+});
+
+it('ignores memo and search-attribute declaration order', function () {
+    $schedule = ScheduleBuilder::new()->id('x')->cron('0 9 * * *')->startWorkflow(DemoWorkflowInterface::class)->build();
+
+    expect(ScheduleHasher::hash($schedule, ['a' => 1, 'b' => 2]))
+        ->toBe(ScheduleHasher::hash($schedule, ['b' => 2, 'a' => 1]));
+});

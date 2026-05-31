@@ -2,9 +2,12 @@
 
 use Keepsuit\LaravelTemporal\Builder\ScheduleBuilder;
 use Keepsuit\LaravelTemporal\Facade\Temporal;
+use Keepsuit\LaravelTemporal\Support\ScheduleHasher;
 use Keepsuit\LaravelTemporal\Support\ScheduleMemo;
 use Keepsuit\LaravelTemporal\TemporalRegistry;
 use Keepsuit\LaravelTemporal\Testing\WithTemporal;
+use Keepsuit\LaravelTemporal\Tests\Fixtures\ScheduleDiscovery\Convergence\ConvergenceScheduleV1;
+use Keepsuit\LaravelTemporal\Tests\Fixtures\ScheduleDiscovery\Convergence\ConvergenceScheduleV2;
 use Keepsuit\LaravelTemporal\Tests\Fixtures\ScheduleDiscovery\Schedules\DemoSchedule;
 use Keepsuit\LaravelTemporal\Tests\Fixtures\WorkflowDiscovery\Workflows\DemoWorkflowInterface;
 use Temporal\Client\Schedule\ScheduleOptions;
@@ -75,6 +78,34 @@ it('pauses and unpauses a schedule', function () {
         expect(findSchedule($id)->info->paused)->toBeFalse();
     } finally {
         Temporal::scheduleClient()->getHandle($id)->delete();
+    }
+})->skip(fn () => ! temporalSchedulesSupported(), 'Temporal test server does not support the Schedules API.');
+
+it('reconciles a changed definition and restamps the drift hash so the next sync converges', function () {
+    app()->bind(TemporalRegistry::class, fn () => (new TemporalRegistry)->registerSchedules(ConvergenceScheduleV1::class));
+
+    try {
+        $this->artisan('temporal:schedule:sync')->assertSuccessful();
+
+        // Edit the definition (V2 has a different cron) and sync again.
+        app()->bind(TemporalRegistry::class, fn () => (new TemporalRegistry)->registerSchedules(ConvergenceScheduleV2::class));
+        $this->artisan('temporal:schedule:sync')->assertSuccessful();
+
+        // The stored hash must now reflect V2. With the old update() path the
+        // memo would still carry V1's hash and sync would never converge.
+        $expected = ScheduleHasher::hash((new ConvergenceScheduleV2)->configure(ScheduleBuilder::new())->build());
+        expect(ScheduleMemo::hash(findSchedule('convergence-schedule')->memo))->toBe($expected);
+
+        // Re-running with the same definition is now a no-op (converged): the
+        // stored hash still matches, so nothing is rewritten.
+        $this->artisan('temporal:schedule:sync')->assertSuccessful();
+        expect(ScheduleMemo::hash(findSchedule('convergence-schedule')->memo))->toBe($expected);
+    } finally {
+        try {
+            Temporal::scheduleClient()->getHandle('convergence-schedule')->delete();
+        } catch (Throwable) {
+            // already removed
+        }
     }
 })->skip(fn () => ! temporalSchedulesSupported(), 'Temporal test server does not support the Schedules API.');
 

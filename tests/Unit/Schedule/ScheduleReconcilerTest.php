@@ -31,6 +31,34 @@ it('plans update for changed schedules and skips unchanged ones', function () {
         ->prunable->toBe([]);
 });
 
+it('treats an unmanaged id collision as a conflict and never updates it', function () {
+    $plan = ScheduleReconciler::plan(
+        desired: ['shared' => 'desired-hash', 'mine' => 'h'],
+        existing: [
+            'shared' => ['hash' => null, 'managed' => false],
+            'mine' => ['hash' => 'h', 'managed' => true],
+        ],
+    );
+
+    expect($plan)
+        ->create->toBe([])
+        ->update->toBe([])
+        ->unchanged->toBe(['mine'])
+        ->prunable->toBe([])
+        ->conflicts->toBe(['shared']);
+});
+
+it('updates a managed schedule whose stored hash is missing', function () {
+    $plan = ScheduleReconciler::plan(
+        desired: ['a' => 'hash'],
+        existing: ['a' => ['hash' => null, 'managed' => true]],
+    );
+
+    expect($plan)
+        ->update->toBe(['a'])
+        ->conflicts->toBe([]);
+});
+
 it('marks managed orphans prunable but never foreign schedules', function () {
     $plan = ScheduleReconciler::plan(
         desired: ['keep' => 'h'],

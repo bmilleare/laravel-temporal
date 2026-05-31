@@ -104,6 +104,11 @@ it('returns a null id when none is set', function () {
     expect(ScheduleBuilder::new()->scheduleId())->toBeNull();
 });
 
+it('rejects an empty or blank schedule id', function () {
+    expect(fn () => ScheduleBuilder::new()->id(''))->toThrow(InvalidArgumentException::class);
+    expect(fn () => ScheduleBuilder::new()->id('   '))->toThrow(InvalidArgumentException::class);
+});
+
 it('targets the configured task queue for the workflow action and allows overriding it', function () {
     config()->set('temporal.queue', 'reports-queue');
 
