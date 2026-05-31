@@ -5,6 +5,7 @@ namespace Keepsuit\LaravelTemporal\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 use Keepsuit\LaravelTemporal\Builder\ScheduleBuilder;
+use Keepsuit\LaravelTemporal\Commands\Concerns\HandlesScheduleApiSupport;
 use Keepsuit\LaravelTemporal\Contracts\ScheduleDefinition;
 use Keepsuit\LaravelTemporal\Support\ScheduleHasher;
 use Keepsuit\LaravelTemporal\Support\ScheduleMemo;
@@ -15,10 +16,13 @@ use Symfony\Component\Console\Attribute\AsCommand;
 use Temporal\Client\Schedule\Schedule;
 use Temporal\Client\Schedule\ScheduleOptions;
 use Temporal\Client\ScheduleClientInterface;
+use Temporal\Exception\Client\ServiceClientException;
 
 #[AsCommand('temporal:schedule:sync')]
 class ScheduleSyncCommand extends Command
 {
+    use HandlesScheduleApiSupport;
+
     protected $signature = 'temporal:schedule:sync
                         {--prune : Delete managed schedules that no longer have a matching definition}
                         {--dry-run : Show the planned changes without applying them}';
@@ -28,7 +32,16 @@ class ScheduleSyncCommand extends Command
     public function handle(ScheduleClientInterface $client, TemporalRegistry $registry): int
     {
         $desired = $this->desiredSchedules($registry);
-        $existing = $this->existingSchedules($client);
+
+        try {
+            $existing = $this->existingSchedules($client);
+        } catch (ServiceClientException $serviceClientException) {
+            if ($this->reportUnsupportedSchedulesApi($serviceClientException)) {
+                return self::FAILURE;
+            }
+
+            throw $serviceClientException;
+        }
 
         $plan = ScheduleReconciler::plan(
             array_map(fn (array $schedule) => $schedule['hash'], $desired),
@@ -85,12 +98,23 @@ class ScheduleSyncCommand extends Command
             $options = $builder->scheduleOptions();
 
             // Carry the user's memo through, then stamp the ownership + hash
-            // markers (reserved keys win, so they can't be clobbered).
+            // markers. The package's markers always win — a user memo that
+            // reuses a reserved key would break drift detection, so it is
+            // dropped and the operator is warned rather than silently ignored.
             $memo = ScheduleMemo::markers($hash);
+            $reserved = array_keys($memo);
             foreach ($options->memo->getValues() as $key => $value) {
-                if (is_string($key) && $key !== '') {
-                    $memo[$key] ??= $value;
+                if (! is_string($key) || $key === '') {
+                    continue;
                 }
+
+                if (in_array($key, $reserved, true)) {
+                    $this->warn(sprintf('Schedule [%s] memo key [%s] is reserved by this package and was ignored.', $id, $key));
+
+                    continue;
+                }
+
+                $memo[$key] = $value;
             }
 
             $options = $options->withMemo($memo);

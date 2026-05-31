@@ -3,13 +3,17 @@
 namespace Keepsuit\LaravelTemporal\Commands;
 
 use Illuminate\Console\Command;
+use Keepsuit\LaravelTemporal\Commands\Concerns\HandlesScheduleApiSupport;
 use Keepsuit\LaravelTemporal\Support\ScheduleMemo;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Temporal\Client\ScheduleClientInterface;
+use Temporal\Exception\Client\ServiceClientException;
 
 #[AsCommand('temporal:schedule:list')]
 class ScheduleListCommand extends Command
 {
+    use HandlesScheduleApiSupport;
+
     protected $signature = 'temporal:schedule:list
                         {--managed : Only show schedules managed by this application}';
 
@@ -19,18 +23,26 @@ class ScheduleListCommand extends Command
     {
         $rows = [];
 
-        foreach ($client->listSchedules() as $entry) {
-            $managed = ScheduleMemo::isManaged($entry->memo);
+        try {
+            foreach ($client->listSchedules() as $entry) {
+                $managed = ScheduleMemo::isManaged($entry->memo);
 
-            if ($this->option('managed') && ! $managed) {
-                continue;
+                if ($this->option('managed') && ! $managed) {
+                    continue;
+                }
+
+                $rows[] = [
+                    $entry->scheduleId,
+                    $entry->info->paused ? 'paused' : 'active',
+                    $managed ? 'yes' : 'no',
+                ];
+            }
+        } catch (ServiceClientException $serviceClientException) {
+            if ($this->reportUnsupportedSchedulesApi($serviceClientException)) {
+                return self::FAILURE;
             }
 
-            $rows[] = [
-                $entry->scheduleId,
-                $entry->info->paused ? 'paused' : 'active',
-                $managed ? 'yes' : 'no',
-            ];
+            throw $serviceClientException;
         }
 
         if ($rows === []) {
