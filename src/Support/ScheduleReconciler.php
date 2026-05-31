@@ -13,8 +13,8 @@ namespace Keepsuit\LaravelTemporal\Support;
 final class ScheduleReconciler
 {
     /**
-     * @param  array<string, string>  $desired  Map of schedule id => content hash.
-     * @param  array<string, array{hash: ?string, managed: bool}>  $existing  Server schedules keyed by id.
+     * @param  array<non-empty-string, string>  $desired  Map of schedule id => content hash.
+     * @param  array<non-empty-string, array{hash: ?string, managed: bool}>  $existing  Server schedules keyed by id.
      */
     public static function plan(array $desired, array $existing): ScheduleReconciliationPlan
     {
