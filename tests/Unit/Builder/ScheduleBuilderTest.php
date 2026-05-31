@@ -122,6 +122,20 @@ it('targets the configured task queue for the workflow action and allows overrid
     expect($override->action->taskQueue->name)->toBe('other-queue');
 });
 
+it('does not share spec mutations between builders cloned from a common base', function () {
+    $base = ScheduleBuilder::new()->timezone('UTC');
+
+    $daily = $base->id('daily')->cron('0 9 * * *');
+    $hourly = $base->id('hourly')->cron('0 * * * *');
+
+    expect($daily->build()->spec->cronStringList)->toBe(['0 9 * * *']);
+    expect($hourly->build()->spec->cronStringList)->toBe(['0 * * * *']);
+
+    // The shared base is untouched by either derived builder.
+    expect($base->build()->spec->cronStringList)->toBe([]);
+    expect($base->scheduleId())->toBeNull();
+});
+
 it('defaults the workflow id to the schedule id and allows overriding it', function () {
     $default = ScheduleBuilder::new()
         ->id('reports')

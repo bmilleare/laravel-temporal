@@ -10,9 +10,12 @@ class DemoSchedule implements ScheduleDefinition
 {
     public function configure(ScheduleBuilder $schedule): ScheduleBuilder
     {
+        // Yearly cadence + paused so that if an integration test is killed
+        // before cleanup, a leaked schedule never actually fires a workflow.
         return $schedule
             ->id('demo-schedule')
-            ->cron('* * * * *')
+            ->cron('0 0 1 1 *')
+            ->paused()
             ->startWorkflow(DemoWorkflowInterface::class);
     }
 }
